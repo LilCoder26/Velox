@@ -13,79 +13,80 @@
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
 </head>
-<body>
-  <div id="app-shell" class="min-h-screen p-6 bg-cover bg-center">
-    <main class="max-w-4xl mx-auto w-full mt-10">
-      <div class="text-center mb-10">
-        <h1 class="text-4xl font-bold text-[#02349b]">Velox Search</h1>
-        <p class="text-[#02349b] mt-2">Find what matters, without the noise.</p>
+<body id="app-shell" class="min-h-screen p-6 bg-cover bg-center">
+  <main class="max-w-4xl mx-auto w-full mt-10">
+    <div class="text-center mb-10">
+      <!-- Logo -->
+      <img src="YOUR_LOGO_URL_HERE" alt="Velox Logo" class="mx-auto h-16 w-16 mb-4">
+      <h1 class="text-4xl font-bold text-[#02349b]">Velox Search</h1>
+      <p class="text-[#02349b] mt-2">Find what matters, without the noise.</p>
+    </div>
+
+    <section class="glass-panel rounded-3xl p-6 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <h2 class="font-bold text-[#02349b]">Make it yours</h2>
+        <p class="text-sm text-[#02349b]/80">Upload a custom background.</p>
       </div>
+      <label for="background-picker" class="cursor-pointer bg-[#02349b] text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity">
+        Select Image
+      </label>
+      <input id="background-picker" type="file" accept="image/*" class="hidden">
+    </section>
 
-      <!-- Clean Background Selector -->
-      <section class="glass-panel rounded-3xl p-6 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div>
-          <h2 class="font-bold text-[#02349b]">Make it yours</h2>
-          <p class="text-sm text-[#02349b]/80">Upload a custom background.</p>
-        </div>
-        <label for="background-picker" class="cursor-pointer bg-[#02349b] text-white px-5 py-2.5 rounded-xl font-semibold text-sm hover:opacity-90 transition-opacity">
-          Select Image
-        </label>
-        <input id="background-picker" type="file" accept="image/*" class="hidden">
-      </section>
+    <form id="search-form" class="mb-6">
+      <div class="flex gap-2 p-2 bg-white border-2 border-[#02349b] rounded-2xl">
+        <input id="search-query" class="w-full px-4 py-2 outline-none text-[#02349b] bg-transparent" placeholder="Search the web..." required>
+        <button class="bg-[#02349b] text-white px-6 py-2 rounded-xl font-bold">Search</button>
+      </div>
+    </form>
 
-      <!-- Search Form -->
-      <form id="search-form" class="mb-6">
-        <div class="flex gap-2 p-2 bg-white border-2 border-[#02349b] rounded-2xl">
-          <input id="search-query" class="w-full px-4 py-2 outline-none text-[#02349b] bg-transparent" placeholder="Search the web..." required>
-          <button id="search-submit" class="bg-[#02349b] text-white px-6 py-2 rounded-xl font-bold">Search</button>
-        </div>
-      </form>
-
-      <div id="results-list" class="grid gap-4"></div>
-    </main>
-  </div>
+    <div id="results-list" class="grid gap-4"></div>
+  </main>
 
   <script>
-    const SERPER_API_KEY = "YOUR_SERPER_API_KEY";
-    const searchForm = document.getElementById("search-form");
-    const searchInput = document.getElementById("search-query");
-    const resultsList = document.getElementById("results-list");
+    const appShell = document.getElementById("app-shell");
 
+    // Load saved background on startup
+    const savedBg = localStorage.getItem("velox-bg");
+    if (savedBg) appShell.style.backgroundImage = `url(${savedBg})`;
+
+    // Handle background upload
+    document.getElementById("background-picker").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target.result;
+        appShell.style.backgroundImage = `url(${dataUrl})`;
+        localStorage.setItem("velox-bg", dataUrl); // Save to local storage
+      };
+      if (file) reader.readAsDataURL(file);
+    });
+
+    // Search Logic
+    const searchForm = document.getElementById("search-form");
     searchForm.addEventListener("submit", async (e) => {
       e.preventDefault();
+      const query = document.getElementById("search-query").value;
+      const resultsList = document.getElementById("results-list");
       resultsList.innerHTML = '<div class="spinner mx-auto mt-10"></div>';
       
       try {
         const res = await fetch("https://google.serper.dev/search", {
           method: "POST",
-          headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
-          body: JSON.stringify({ q: searchInput.value })
+          headers: { "X-API-KEY": "YOUR_SERPER_API_KEY", "Content-Type": "application/json" },
+          body: JSON.stringify({ q: query })
         });
         const data = await res.json();
         resultsList.innerHTML = "";
-        
-        if (data.organic && data.organic.length > 0) {
-          data.organic.forEach(item => {
-            resultsList.innerHTML += `
-              <div class="glass-panel p-5 rounded-2xl">
-                <a href="${item.link}" target="_blank" class="font-bold text-[#02349b] underline text-lg">${item.title}</a>
-                <p class="text-sm text-[#02349b] mt-2 opacity-90">${item.snippet}</p>
-              </div>`;
-          });
-        } else {
-          resultsList.innerHTML = "<p class='text-center'>No results found.</p>";
-        }
+        data.organic.forEach(item => {
+          resultsList.innerHTML += `
+            <div class="glass-panel p-5 rounded-2xl">
+              <a href="${item.link}" target="_blank" class="font-bold text-[#02349b] underline text-lg">${item.title}</a>
+              <p class="text-sm text-[#02349b] mt-2 opacity-90">${item.snippet}</p>
+            </div>`;
+        });
       } catch {
-        resultsList.innerHTML = "<p class='text-center'>Error fetching results. Please check your API key.</p>";
-      }
-    });
-
-    document.getElementById("background-picker").addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = (event) => document.getElementById("app-shell").style.backgroundImage = `url(${event.target.result})`;
-        reader.readAsDataURL(file);
+        resultsList.innerHTML = "<p class='text-center'>Error fetching results.</p>";
       }
     });
   </script>
