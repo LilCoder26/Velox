@@ -1,91 +1,87 @@
-<!DOCTYPE html>
-<html lang='en'>
+<!doctype html>
+<html lang="en">
 <head>
-  <meta charset='UTF-8'>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Velox Search</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <style>
-    body {
-      margin: 0;
-      background-color: #02349b; /* Requested Background */
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
-      font-family: sans-serif;
-    }
+    :root { --velox-blue: #02349b; }
+    * { box-sizing: border-box; color: #02349b; } /* Set default text color */
+    body { margin: 0; font-family: "DM Sans", sans-serif; background-color: #ffffff; }
 
-    form {
-      background-color: white; /* Requested Input Color */
-      width: 400px;
-      height: 44px;
-      border-radius: 32px;
-      display: flex;
-      align-items: center;
-      margin-top: 50px;
-    }
-
-    input {
-      all: unset;
-      font: 16px system-ui;
-      color: black;
-      width: 100%;
-      padding-left: 20px;
-    }
-
-    button {
-      all: unset;
-      cursor: pointer;
-      padding-right: 15px;
-    }
-
-    svg { fill: #02349b; width: 20px; height: 20px; }
-
-    #results { 
-      width: 80%; 
-      max-width: 600px; 
-      margin-top: 30px; 
-      color: white; 
-    }
+    .velox-shell { width: 100%; min-height: 100vh; position: relative; overflow: hidden; background-position: center; background-size: cover; }
+    .glass-panel { background: rgba(255, 255, 255, 0.8); border: 1px solid rgba(2, 52, 155, 0.1); box-shadow: 0 10px 30px rgba(2, 52, 155, 0.1); backdrop-filter: blur(10px); }
     
-    a { color: #87CEEB; }
+    .file-control::file-selector-button { border: 0; border-radius: 999px; background: #eaf1ff; color: #02349b; cursor: pointer; font-weight: 600; padding: 0.5rem 1rem; }
+    
+    .result-card { background: #fff; border: 1px solid #eaf1ff; box-shadow: 0 4px 12px rgba(2, 52, 155, 0.08); }
+    .spinner { width: 1.5rem; height: 1.5rem; border: 3px solid rgba(2, 52, 155, 0.2); border-top-color: #02349b; border-radius: 50%; animation: spin 0.75s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
   </style>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
+  <div id="app-shell" class="velox-shell flex flex-col p-6">
+    <main class="max-w-4xl mx-auto w-full mt-10">
+      <div class="text-center mb-10">
+        <h1 class="text-4xl font-bold text-[#02349b]">Velox Search</h1>
+        <p class="text-[#02349b] mt-2">Find what matters, without the noise.</p>
+      </div>
 
-  <form role="search" id="form">
-    <input type="search" id="query" placeholder="Search..." required>
-    <button type="submit">
-      <svg viewBox="0 0 1024 1024"><path d="M848.471 928l-263.059-263.059c-48.941 36.706-110.118 55.059-177.412 55.059-171.294 0-312-140.706-312-312s140.706-312 312-312c171.294 0 312 140.706 312 312 0 67.294-24.471 128.471-55.059 177.412l263.059 263.059-79.529 79.529zM189.623 408.078c0 121.364 97.091 218.455 218.455 218.455s218.455-97.091 218.455-218.455c0-121.364-103.159-218.455-218.455-218.455-121.364 0-218.455 97.091-218.455 218.455z"></path></svg>
-    </button>
-  </form>
+      <section class="glass-panel rounded-3xl p-6 mb-6">
+        <h2 class="font-semibold text-[#02349b]">Make it yours</h2>
+        <p class="text-sm mt-1 text-[#02349b]">Upload an image.</p>
+        <input id="background-picker" type="file" accept="image/*" class="mt-4 text-sm text-[#02349b]">
+      </section>
 
-  <div id="results"></div>
+      <form id="search-form" class="mb-6">
+        <div class="flex gap-2 p-2 bg-white border-2 border-[#02349b] rounded-2xl">
+          <input id="search-query" class="w-full px-4 py-2 outline-none text-[#02349b]" placeholder="Search the web..." required>
+          <button id="search-submit" class="bg-[#02349b] text-white px-6 py-2 rounded-xl font-bold">Search</button>
+        </div>
+      </form>
+
+      <div id="status-panel"></div>
+      <div id="results-list" class="grid gap-4"></div>
+    </main>
+  </div>
 
   <script>
-    const f = document.getElementById('form');
-    const q = document.getElementById('query');
-    const resultsDiv = document.getElementById('results');
+    const SERPER_API_KEY = "YOUR_SERPER_API_KEY";
+    const searchForm = document.getElementById("search-form");
+    const searchInput = document.getElementById("search-query");
+    const resultsList = document.getElementById("results-list");
+    const statusPanel = document.getElementById("status-panel");
 
-    f.addEventListener('submit', async (e) => {
+    searchForm.addEventListener("submit", async (e) => {
       e.preventDefault();
-      resultsDiv.innerHTML = "Searching...";
+      resultsList.innerHTML = '<div class="spinner mx-auto"></div>';
+      
+      try {
+        const res = await fetch("https://google.serper.dev/search", {
+          method: "POST",
+          headers: { "X-API-KEY": SERPER_API_KEY, "Content-Type": "application/json" },
+          body: JSON.stringify({ q: searchInput.value })
+        });
+        const data = await res.json();
+        resultsList.innerHTML = "";
+        data.organic.forEach(item => {
+          resultsList.innerHTML += `
+            <div class="result-card p-4 rounded-xl">
+              <a href="${item.link}" target="_blank" class="font-bold text-[#02349b] underline">${item.title}</a>
+              <p class="text-sm text-[#02349b] mt-1">${item.snippet}</p>
+            </div>`;
+        });
+      } catch {
+        resultsList.innerHTML = "<p class='text-center text-[#02349b]'>Error fetching results.</p>";
+      }
+    });
 
-      const response = await fetch('https://google.serper.dev/search', {
-        method: 'POST',
-        headers: {
-          'X-API-KEY': 'YOUR_NEW_KEY_HERE',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ q: q.value })
-      });
-
-      const data = await response.json();
-      resultsDiv.innerHTML = data.organic.map(item => `
-        <div style="margin-bottom: 20px;">
-          <a href="${item.link}" target="_blank" style="font-size: 1.2em;">${item.title}</a><br>
-          <small>${item.snippet}</small>
-        </div>
-      `).join('');
+    document.getElementById("background-picker").addEventListener("change", (e) => {
+      const reader = new FileReader();
+      reader.onload = (event) => document.getElementById("app-shell").style.backgroundImage = `url(${event.target.result})`;
+      reader.readAsDataURL(e.target.files[0]);
     });
   </script>
 </body>
